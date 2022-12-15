@@ -8,6 +8,18 @@
 
 ## Prerequisites
 
+### System requirements
+
+```bash
+$ ls `xcode-select -p`/Platforms/MacOSX.platform/Developer/SDKs
+```
+To check whether you have it, and what version you have. 
+
+output:
+```bash
+MacOSX.sdk	MacOSX12.3.sdk
+```
+
 ### Install depot_tools
 
 Clone the depot_tools repository:
