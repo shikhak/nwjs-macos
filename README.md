@@ -2,8 +2,8 @@
 
 ## Steps to build NW.js binaries on MacOS
 
-* MacOS Version: MacoS Monterey - 12.2
-* Python Version: 3.10.8
+* MacOS Version: MacoS Monterey - 12.2 (also notes for building on Ventura 13.0.1)
+* Python Version: 3.10.8 (note that python3 is preinstalled on macOS 13.0.1 )
 
 
 ## Prerequisites
@@ -17,7 +17,9 @@ To check whether you have it, and what version you have.
 
 **Output:**
 ```bash
-MacOSX.sdk  MacOSX12.3.sdk
+MacOSX.sdk  MacOSX12.3.sdk
+or
+MacOSX.sdk  MacOSX13.0.sdk  MacOSX13.sdk
 ```
 
 ### Install depot_tools
@@ -87,6 +89,31 @@ This usually downloads 20G+ from GitHub and Google's Git repos. Make sure you ha
 
 When finished, you will see a `src` folder created in the same folder as `.gclient`.
 
+The macOS 13.0.1 compiler complains about the use of 'sprintf', and the compilation fails.  To avoid this problem, modify this section in nwjs/src/third_party/harfbuzz-ng/BUILD.gn
+
+```bash
+  config("harfbuzz_warnings") {
+    if (is_win) {
+      # Result of 32-bit shift implicitly converted to 64 bits.
+      cflags = [ "/wd4334" ]
+    }
+  } 
+ ```
+ 
+ to this
+ 
+ ```bash
+ config("harfbuzz_warnings") {
+    if (is_win) {
+      # Result of 32-bit shift implicitly converted to 64 bits.
+      cflags = [ "/wd4334" ]
+    }
+    if (is_ios || is_mac) {
+      cflags = [ "-Wno-error", "-Wno-deprecated-declarations" ]
+    }
+  }
+  ```
+
 ## Generate ninja build files with GN for Chromium
 
 ```bash
@@ -128,6 +155,10 @@ python3 src/third_party/node-nw/tools/gyp/gyp_main.py -I src/third_party/node-nw
 cd src
 ninja -C out/nw nwjs
 ```
+The resulting NW.js executable (named nwjs) can be found at the following path:
+~/nwjs/src/out/nw/nwjs.app/Contents/MacOS/nwjs
+
+
 
 **Note:** While building NW.js, I encountered following missing files error. They were in a different folder, I simply copied them to where the error was coming from.
 
@@ -137,6 +168,38 @@ Error processing node <?xml version="1.0" encoding="UTF-8"?>
 
 Error processing node <?xml version="1.0" encoding="UTF-8"?>
 <include file="${root_gen_dir}\chrome\browser\resources\inline_login\preprocessed\inline_login_browser_proxy.js" name="IDR_INLINE_LOGIN_BROWSER_PROXY_JS" type="BINDATA" use_base_dir="false" />: [Errno 2] No such file or directory: '../../out/nw/gen/chrome/browser/resources/inline_login/preprocessed/inline_login_browser_proxy.js'
+```
+
+Here are the copy commands:
+```bash
+cp ~/nwjs/src/out/nw/gen/chrome/browser/resources/inline_login/tsc/inline_login_app.js ~/nwjs/src/out/nw/gen/chrome/browser/resources/inline_login/preprocessed
+cp ~/nwjs/src/out/nw/gen/chrome/browser/resources/inline_login/tsc/inline_login_browser_proxy.js ~/nwjs/src/out/nw/gen/chrome/browser/resources/inline_login/preprocessed
+```
+
+If the copy commands fail (because the source files are missing), then build them like this and retry the copy commands:
+
+```bash
+cd ~/nwjs/src
+ninja -C out/nw chrome/browser/resources/inline_login:build_ts
+```
+
+FYI, there are some other targets that seem related to the missing JS files.  It is worth trying to build these other targets (with the ninja -C ...) command to see if the build system generates the JS files and (with luck) also copies them to the proper location.  Here are several gn targets that seem related:
+
+```bash
+cd ~/nwjs/src
+gn ls out/nw | grep resources
+```
+
+The related targets are:
+
+```bash
+//chrome/browser/resources/inline_login:build_grd
+//chrome/browser/resources/inline_login:build_ts
+//chrome/browser/resources/inline_login:html_wrapper_files
+//chrome/browser/resources/inline_login:preprocess
+//chrome/browser/resources/inline_login:preprocess_static_files
+//chrome/browser/resources/inline_login:resources
+//chrome/browser/resources/inline_login:resources_grit
 ```
 
 ## Build Node
